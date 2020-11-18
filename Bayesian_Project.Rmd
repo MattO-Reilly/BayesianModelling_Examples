@@ -1,0 +1,50 @@
+---
+title: "Bayesian_Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Libraries*
+```{r}
+library(tidyverse)
+
+```
+
+```{r}
+#Load data from Github
+math_student_data_url <- "https://raw.githubusercontent.com/arunk13/MSDA-Assignments/master/IS607Fall2015/Assignment3/student-mat.csv";
+math_student_data <- read.table(file = math_student_data_url, header = TRUE, sep = ";");
+eng_student_data_url <- "https://raw.githubusercontent.com/arunk13/MSDA-Assignments/master/IS607Fall2015/Assignment3/student-por.csv";
+eng_student_data <- read.table(file = eng_student_data_url, header = TRUE, sep = ";")
+studentdata <- rbind(math_student_data, eng_student_data)
+
+
+#Clean Data
+studentdata[c("G1","G2","G3")] <- studentdata[c("G1","G2","G3")] * 5
+#Grades were originally out of 20 (Based on european grading scale) but for Ireland we would like our results out of 100.
+```
+
+*Defining prior*
+```{r}
+m0 <- 60
+s0 <- 15
+
+myplot <- ggplot(studentdata, aes(x=sex,y=G3)) + geom_point() + 
+  geom_abline(intercept=0,slope=1) 
+ggMarginal(myplot, type = "histogram")
+```
+
+*Comparing Grades by Sex*
+```{r}
+studentdata %>% group_by(sex) %>% summarise(group.means = mean(G3), n = length(sex))
+
+sigma = 50
+se_male <- sigma/sqrt(n_male)
+se_female <- sigma/sqrt(n_female)
+
+
+```
+

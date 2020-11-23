@@ -1,5 +1,6 @@
 ---
 title: "Bayesian_Project"
+author: Matt O'Reilly and Kordian Pawelec
 output: html_document
 ---
 

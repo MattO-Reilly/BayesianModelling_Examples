@@ -14,6 +14,7 @@ library(tidyverse)
 library(ggExtra)
 library(ggplot2)
 source('TeachBayes.r')
+library(rjags)
 ```
 
 ```{r}
@@ -27,7 +28,12 @@ studentdata <- rbind(math_student_data, eng_student_data)
 
 #Clean Data
 studentdata[c("G1","G2","G3")] <- studentdata[c("G1","G2","G3")] * 5
-#Grades were originally out of 20 (Based on european grading scale) but for Ireland we would like our results out of 100.
+
+```
+Grades were originally out of 20 (Based on european grading scale) but for Ireland we would like our results out of 100 so we have multiplied our grades by 5 to achieve our desired results.
+
+```{r}
+studentdata %>% summarise(mean = mean(studentdata$G3), sd = sd(studentdata$G3))
 ```
 
 *Defining prior*
@@ -46,6 +52,8 @@ xbar <- mean(studentdata$G3)
 sigma <- 15
 n = length(studentdata$G3)
 se <- sigma/sqrt(n)
+
+xbar
 ```
 *Plot the prior, data and posterior*
 ```{r}
@@ -100,4 +108,104 @@ Posterior2_M
 
 many_normal_plots(list(Prior,Posterior1_F,Posterior2_M)) + theme(legend.position = c(0.75,0.75))
 ```
+#Estimate Mean and SD using rjags
+```{r}
+# Take 10000 samples from the theta prior
+prior_m <- rnorm(10000, 56.7, 15)
+# Take 10000 samples from the sigma prior 
+prior_s <- runif(10000, 0, 50)
+samples <- data.frame(prior_m, prior_s)
 
+# Density plots of the prior_m samples 
+ggplot(samples, aes(x = prior_m)) + 
+    geom_density()
+# Density plots of the prior_s samples   
+ggplot(samples, aes(x = prior_s)) + 
+    geom_density()
+
+grade_model <- "model{
+  #Likelihood model for X
+  for(i in 1:length(X)) {
+      X[i] ~ dnorm(theta, sigma^(-2))
+  }
+
+  # Prior models for theta and sigma
+  theta ~ dnorm(56.7, 15^(-2))
+  sigma ~ dunif(0, 50)
+}"
+
+grade_jags <- jags.model(textConnection(grade_model), data = list(X = studentdata$G3),
+    inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 1989))
+
+grade_sim <- update(grade_jags, n.iter = 10000)    
+# SIMULATE the posterior  
+n = 20000
+grade_sim <- coda.samples(model = grade_jags, 
+                         variable.names = c("theta","sigma"), 
+                         n.iter= n)
+head(grade_sim)
+
+
+# PLOT the posterior    
+plot(grade_sim, density = FALSE)
+
+# PLOT the posterior    
+plot(grade_sim, trace = FALSE)
+
+# Store the chains in a data frame
+grade_chains <- data.frame(sim = 1:n, grade_sim[[1]])
+# Check out the head of rent_chains
+head(grade_chains)
+
+
+# Use ggplot() to construct a density plot of the theta chain
+ggplot(grade_chains, aes(x = sim, y = theta)) + geom_line()
+# Use ggplot() to construct a density plot of the theta chain
+ggplot(grade_chains, aes(x = theta)) + geom_density()
+```
+#Running multiple chains
+```{r}
+# COMPILE the model
+grade_jags_multi <- jags.model(textConnection(grade_model), 
+                              data = list(X = studentdata$G3), 
+                              n.chains = 4)   
+# UPDATE the model    
+grade_sim_multi <- update(grade_jags_multi,
+                         n.iter = 10000)
+# SIMULATE the posterior    
+grade_sim_multi <- coda.samples(model = grade_jags_multi, 
+                               variable.names = c("theta", "sigma"), 
+                               n.iter = 20000)
+head(grade_sim_multi)
+
+# Construct trace plots of the theta and sigma chains
+plot(grade_sim_multi, density = FALSE)
+
+# Construct density plots of the theta and sigma chains
+plot(grade_sim_multi, trace = FALSE)
+
+grade_chains_multi <- data.frame(sim = rep(1:20000,4),
+                                chain = c(rep(1,20000),
+                                          rep(2,20000),
+                                          rep(3,20000),
+                                          rep(4,20000)),
+                                rbind(grade_sim_multi[[1]],
+                                      grade_sim_multi[[2]],
+                                      grade_sim_multi[[3]],
+                                      grade_sim_multi[[4]]))
+
+grade_chains_multi %>% filter(sim<1000) %>%
+ggplot(aes(x=sim,y=theta,color=as.factor(chain))) + geom_line() + 
+  geom_smooth(aes(color=as.factor(chain)),se=FALSE)
+```
+**Gelman-Rubin diagnostic**
+```{r}
+gelman.diag(grade_sim_multi)
+gelman.plot(grade_sim_multi)
+```
+Since the median converges to 1 quite quickly, this suggests the chains have converged to the stationary distribution
+
+```{r}
+autocorr.plot(grade_sim)
+```
+Here there is no correlation between the iterates of \(theta\), while there is minimal correlation for \(sigma\). 

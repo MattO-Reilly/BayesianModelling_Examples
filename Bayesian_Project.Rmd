@@ -74,9 +74,13 @@ diff(quantile(mysims, probs = c(0.25,0.75)))
 studentdata %>% group_by(sex) %>% summarise(group.means = mean(G3), n = length(sex))
 
 sigma = 50
-se_male <- sigma/sqrt(n_male)
-se_female <- sigma/sqrt(n_female)
 
+n_F <- sum(studentdata$sex=='F')
+n_M <- sum(studentdata$sex=='M')
+
+se_male <- sigma/sqrt(n_F)
+se_female <- sigma/sqrt(n_M)
+se_male
 
 ```
 

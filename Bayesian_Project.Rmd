@@ -15,6 +15,7 @@ library(ggExtra)
 library(ggplot2)
 source('TeachBayes.r')
 library(rjags)
+library(ggpubr)
 ```
 
 ```{r}
@@ -33,17 +34,16 @@ studentdata[c("G1","G2","G3")] <- studentdata[c("G1","G2","G3")] * 5
 Grades were originally out of 20 (Based on european grading scale) but for Ireland we would like our results out of 100 so we have multiplied our grades by 5 to achieve our desired results.
 
 ```{r}
-studentdata %>% summarise(mean = mean(studentdata$G3), sd = sd(studentdata$G3))
+studentdata %>% summarise(N=n(), mean = mean(studentdata$G3), sd = sd(studentdata$G3))
 ```
+There are N=1044 students in our dataset, The mean final grade is 56.70977 while the standard deviation is 19.32398. With normal data, most of the observations are spread within 3 standard deviations on each side of the mean.
+
 
 *Defining prior*
 ```{r}
 m0 <- 60
+se <- 19.32398/sqrt(1044)
 s0 <- 1 #Sigma_0 (Using a larger value for sigma_0 to allow for extra variation in Final Grade)
-
-myplot <- ggplot(studentdata, aes(x=age,y=G3)) + geom_point() + 
-  geom_abline(intercept=0,slope=1) 
-ggMarginal(myplot, type = "histogram")
 ```
 
 *Likelihood*
@@ -69,28 +69,26 @@ lines(x, datax,col='black',lwd=3)
 lines(x, postx,col='red',lwd=3)
 legend("topright", c("Prior","Data","Posterior"), lty = 1, lwd= 3, col = c('blue','black','red'))
 ```
+The posterior has shifted to the left towards the data. Our prior belief is a normal distribution $X\sim N(\theta,\sigma^2)$ with mean = 60 and $\sigma$ = 1. The mode is now approximately 57. We can see the distribution is more precise than both the data and prior, taking advatange of combining information from both.
+
 *Measures of spread*
 ```{r}
 mysims <- rnorm(10000, mean = Posterior[1], sd = Posterior[2])
-quantile(mysims, probs = c(0.25,0.75))
 diff(quantile(mysims, probs = c(0.25,0.75)))
 ```
 
 
 *Comparing Grades by Sex*
 ```{r}
-studentdata %>% group_by(sex) %>% summarise(group.means = mean(G3), n = length(sex))
-
-sigma = 50
+studentdata %>% group_by(sex) %>% summarise(mean = mean(G3), n = length(sex), sigma = sd(G3))
 
 n_F <- sum(studentdata$sex=='F')
 n_M <- sum(studentdata$sex=='M')
 
-se_male <- sigma/sqrt(n_F)
-se_female <- sigma/sqrt(n_M)
-se_male
-
+#se_male <- sigma/sqrt(n_F)
+#se_female <- sigma/sqrt(n_M)
 ```
+Summarising the mean grade by sex we can see that females have a mean grade slightly higher than males. However, the difference is quite small.
 
 ```{r}
 xbar1_F <- studentdata %>% filter(studentdata$sex == 'F') %>% 
@@ -101,13 +99,13 @@ Prior <- c(m0, s0)
 Grades_Female <- c(xbar1_F, se)
 Grades_Male <- c(xbar2_M, se)
 Posterior1_F <- normal_update(Prior, Grades_Female)
-Posterior1_F
 
 Posterior2_M <- normal_update(Prior, Grades_Male)
-Posterior2_M
 
 many_normal_plots(list(Prior,Posterior1_F,Posterior2_M)) + theme(legend.position = c(0.75,0.75))
 ```
+From the plot, we can see that the Blue curve is our prior. The red curve represents the average final grade of male students, which has a mode of 57.0651757. The green distribution represents the average final grade of female students, which has a mode of 57.9685636.
+
 #Estimate Mean and SD using rjags
 ```{r}
 # Take 10000 samples from the theta prior
@@ -115,13 +113,6 @@ prior_m <- rnorm(10000, 56.7, 15)
 # Take 10000 samples from the sigma prior 
 prior_s <- runif(10000, 0, 50)
 samples <- data.frame(prior_m, prior_s)
-
-# Density plots of the prior_m samples 
-ggplot(samples, aes(x = prior_m)) + 
-    geom_density()
-# Density plots of the prior_s samples   
-ggplot(samples, aes(x = prior_s)) + 
-    geom_density()
 
 grade_model <- "model{
   #Likelihood model for X
@@ -157,12 +148,13 @@ grade_chains <- data.frame(sim = 1:n, grade_sim[[1]])
 # Check out the head of rent_chains
 head(grade_chains)
 
-
-# Use ggplot() to construct a density plot of the theta chain
-ggplot(grade_chains, aes(x = sim, y = theta)) + geom_line()
-# Use ggplot() to construct a density plot of the theta chain
-ggplot(grade_chains, aes(x = theta)) + geom_density()
+mean(grade_chains$sigma)
+mean(grade_chains$theta)
 ```
+We can see the trace plots for Sigma and Theta have no patterns and there is good mixing this indicates that they are stable.
+
+The density plots are also normally distributed  
+
 #Running multiple chains
 ```{r}
 # COMPILE the model

@@ -204,11 +204,10 @@ Here there is no correlation between the iterates of \(theta\), while there is m
 
 
 
+--------------------------------------------
 
 
-
-Time study and grades
-
+**Time study and grades**
 ```{r}
 time_model <- "model{
     # Likelihood model for Y[i]

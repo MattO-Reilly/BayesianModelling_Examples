@@ -201,3 +201,84 @@ Since the median converges to 1 quite quickly, this suggests the chains have con
 autocorr.plot(grade_sim)
 ```
 Here there is no correlation between the iterates of \(theta\), while there is minimal correlation for \(sigma\). 
+
+
+
+
+
+
+Time study and grades
+
+```{r}
+time_model <- "model{
+    # Likelihood model for Y[i]
+    for(i in 1:length(Y)) {
+      Y[i] ~ dpois(theta[i])
+      log(theta[i]) <- a + b*X[i] # log-link
+    }
+
+    # Define the flat priors for a, b
+    a ~ dnorm(0, 19^(-2))
+    b ~ dnorm(0, 19^(-2))
+
+    # Transform b to the alcohol unit scale (b) is on the log scale
+    b.counts <- exp(b)
+}"
+
+
+time_jags <- jags.model(textConnection(time_model), 
+                        data = list(Y = studentdata$G3, 
+                                    X = studentdata$age), 
+                        n.chains = 4)
+
+
+
+
+
+# BURN IN the model
+time_sim <- update(time_jags, n.iter = 20000)
+# SIMULATE the posterior    
+time_sim <- coda.samples(model=time_jags,
+                         variable.names=c("a","b","b.counts"),
+                         n.iter=50000,
+                         thin = 10)
+```
+
+```{r}
+plot(time_sim[[1]][,1], main = 'a')
+plot(time_sim[[1]][,2], main = 'b')
+plot(time_sim[[1]][,3], main = 'b.counts')
+```
+
+
+```{r}
+summary(time_sim)
+```
+
+
+
+
+```{r}
+freq_poisson_model <- glm(studytime ~ G3, family = poisson(link = "log"), data = studentdata)
+summary(freq_poisson_model)  
+```
+
+
+
+
+```{r}
+gelman.diag(time_sim)
+gelman.plot(time_sim[,1:3])
+autocorr.plot(time_sim[[1]][,1:3])
+```
+
+
+
+```{r}
+time_chains <- data.frame(time_sim[[1]])
+quantile(time_chains$b.counts, probs = c(0.025,0.975))
+
+
+ggplot(time_chains, aes(x = b.counts)) + geom_density() + 
+  geom_vline(xintercept = quantile(time_chains$b.counts, probs = c(0.025,0.975)), color = 'red')
+```

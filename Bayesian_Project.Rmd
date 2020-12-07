@@ -219,15 +219,16 @@ time_model <- "model{
     # Define the flat priors for a, b
     a ~ dnorm(0, 19^(-2))
     b ~ dnorm(0, 19^(-2))
-
-    # Transform b to the alcohol unit scale (b) is on the log scale
+    
     b.counts <- exp(b)
+
+  
 }"
 
 
 time_jags <- jags.model(textConnection(time_model), 
                         data = list(Y = studentdata$G3, 
-                                    X = studentdata$age), 
+                                    X = studentdata$studytime), 
                         n.chains = 4)
 
 
@@ -235,13 +236,20 @@ time_jags <- jags.model(textConnection(time_model),
 
 
 # BURN IN the model
-time_sim <- update(time_jags, n.iter = 20000)
+time_sim <- update(time_jags, n.iter = 10000)
 # SIMULATE the posterior    
 time_sim <- coda.samples(model=time_jags,
                          variable.names=c("a","b","b.counts"),
-                         n.iter=50000,
+                         n.iter=10000,
                          thin = 10)
 ```
+
+
+
+
+
+
+
 
 ```{r}
 plot(time_sim[[1]][,1], main = 'a')
@@ -250,10 +258,14 @@ plot(time_sim[[1]][,3], main = 'b.counts')
 ```
 
 
+
+
+
+
+
 ```{r}
 summary(time_sim)
 ```
-
 
 
 
@@ -263,15 +275,11 @@ summary(freq_poisson_model)
 ```
 
 
-
-
 ```{r}
 gelman.diag(time_sim)
 gelman.plot(time_sim[,1:3])
 autocorr.plot(time_sim[[1]][,1:3])
 ```
-
-
 
 ```{r}
 time_chains <- data.frame(time_sim[[1]])
@@ -281,3 +289,6 @@ quantile(time_chains$b.counts, probs = c(0.025,0.975))
 ggplot(time_chains, aes(x = b.counts)) + geom_density() + 
   geom_vline(xintercept = quantile(time_chains$b.counts, probs = c(0.025,0.975)), color = 'red')
 ```
+There is a positive association between time studied and grade achieved
+For every hour of study, mean grade achieved increases by 7.8%
+There's a probability of 0.95 that study time increases mean grade achieved  by between 5.6, 7.8%

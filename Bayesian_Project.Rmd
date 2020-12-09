@@ -18,6 +18,14 @@ library(rjags)
 library(ggpubr)
 ```
 
+###Aim
+2020 marked the first-ever occurence of predicted grades for students in Ireland. The Irish Government had to provide an estimated mark across all subjects for each student in the country. There were many issues with their model.So, Using Bayesian Statistics and a dataset of student grades, we want to build a model that can predict an end of year grade from personal and academic characteristics.
+
+Our objective is to create a model that can acuurately predict end of year grades based on student information. We will aim to use variables like Mock Examination Results, Gender, Study Time, Absences, Failures, and Parents Education to predict their end of year grade. 
+
+###Subjective Impression
+
+We found a dataset online \href{https://archive.ics.uci.edu/ml/datasets/Student+Performance}{here}. The dataset included grades and student information for 1044 students taken from a school in Portugal. The portuguese system measures grades from 0 to 20 and for convenience we have multiplied the grades by 5 to get a grade out of 100.  
 ```{r}
 #Load data from Github
 math_student_data_url <- "https://raw.githubusercontent.com/arunk13/MSDA-Assignments/master/IS607Fall2015/Assignment3/student-mat.csv";
@@ -31,8 +39,8 @@ studentdata <- rbind(math_student_data, eng_student_data)
 studentdata[c("G1","G2","G3")] <- studentdata[c("G1","G2","G3")] * 5
 
 ```
-Grades were originally out of 20 (Based on european grading scale) but for Ireland we would like our results out of 100 so we have multiplied our grades by 5 to achieve our desired results.
 
+##Estimate Mean Grade
 ```{r}
 studentdata %>% summarise(N=n(), mean = mean(studentdata$G3), sd = sd(studentdata$G3))
 ```
@@ -78,7 +86,7 @@ diff(quantile(mysims, probs = c(0.25,0.75)))
 ```
 
 
-*Comparing Grades by Sex*
+##Comparing Grades by Sex
 ```{r}
 studentdata %>% group_by(sex) %>% summarise(mean = mean(G3), n = length(sex), sigma = sd(G3))
 
@@ -106,7 +114,7 @@ many_normal_plots(list(Prior,Posterior1_F,Posterior2_M)) + theme(legend.position
 ```
 From the plot, we can see that the Blue curve is our prior. The red curve represents the average final grade of male students, which has a mode of 57.0651757. The green distribution represents the average final grade of female students, which has a mode of 57.9685636.
 
-#Estimate Mean and SD using rjags
+##Estimate Mean and SD using rjags
 ```{r}
 # Take 10000 samples from the theta prior
 prior_m <- rnorm(10000, 56.7, 15)
@@ -151,7 +159,7 @@ head(grade_chains)
 mean(grade_chains$sigma)
 mean(grade_chains$theta)
 ```
-We can see the trace plots for Sigma and Theta have no patterns and there is good mixing this indicates that they are stable.
+It is desirable to have stability in the trace plot (no patterns), with good mixing. From our trace plots for Sigma and Theta we can see they have no patterns and there is good mixing, this indicates that they are stable.
 
 The density plots are also normally distributed  
 
@@ -203,92 +211,71 @@ autocorr.plot(grade_sim)
 Here there is no correlation between the iterates of \(theta\), while there is minimal correlation for \(sigma\). 
 
 
-
---------------------------------------------
-
-
-**Time study and grades**
+##Bayesian Regression (Time spent studying and grades)
 ```{r}
-time_model <- "model{
+studytime_model <- "model{
     # Likelihood model for Y[i]
     for(i in 1:length(Y)) {
-      Y[i] ~ dpois(theta[i])
-      log(theta[i]) <- a + b*X[i] # log-link
+      m[i] <- a + b * X[i]
+      Y[i] ~ dnorm(m[i], s^(-2))
     }
 
-    # Define the flat priors for a, b
+    # Define the a, b, s priors
     a ~ dnorm(0, 19^(-2))
     b ~ dnorm(0, 19^(-2))
-    
-    b.counts <- exp(b)
+    s ~ dunif(0, 30)}"
 
-  
-}"
-
-
-time_jags <- jags.model(textConnection(time_model), 
+studytime_jags <- jags.model(textConnection(studytime_model), 
                         data = list(Y = studentdata$G3, 
                                     X = studentdata$studytime), 
                         n.chains = 4)
 
-
-
-
-
 # BURN IN the model
-time_sim <- update(time_jags, n.iter = 10000)
+studytime_sim <- update(studytime_jags, n.iter = 10000)
 # SIMULATE the posterior    
-time_sim <- coda.samples(model=time_jags,
-                         variable.names=c("a","b","b.counts"),
-                         n.iter=10000,
+studytime_sim <- coda.samples(model=studytime_jags,
+                         variable.names=c("a","b","s"),
+                         n.iter=20000,
                          thin = 10)
 ```
 
 
-
-
-
-
-
-
 ```{r}
-plot(time_sim[[1]][,1], main = 'a')
-plot(time_sim[[1]][,2], main = 'b')
-plot(time_sim[[1]][,3], main = 'b.counts')
-```
-
-
-
-
-
-
-
-```{r}
-summary(time_sim)
-```
-
-
-
-```{r}
-freq_poisson_model <- glm(studytime ~ G3, family = poisson(link = "log"), data = studentdata)
-summary(freq_poisson_model)  
+plot(studytime_sim[[1]][,1], main = 'a')
+plot(studytime_sim[[1]][,2], main = 'b')
+plot(studytime_sim[[1]][,3], main = 's')
 ```
 
 
 ```{r}
-gelman.diag(time_sim)
-gelman.plot(time_sim[,1:3])
-autocorr.plot(time_sim[[1]][,1:3])
+summary(studytime_sim)
 ```
 
 ```{r}
-time_chains <- data.frame(time_sim[[1]])
+#freq_poisson_model <- glm(studytime ~ G3, family = poisson(link = "log"), data = studentdata)
+#summary(freq_poisson_model)  
+```
+
+```{r}
+gelman.diag(studytime_sim)
+gelman.plot(studytime_sim[,1:3])
+autocorr.plot(studytime_sim[[1]][,1:3])
+```
+Since the median converges to 1 quite quickly, this suggests the chains have converged to the stationary distribution
+
+```{r}
+studytime_chains <- data.frame(studytime_sim[[1]])
 quantile(time_chains$b.counts, probs = c(0.025,0.975))
 
+# Summarise the posterior Markov chains
+summary(studytime_sim)[1]
+# Summarise the posterior Markov chains
+summary(studytime_sim)[2]
 
 ggplot(time_chains, aes(x = b.counts)) + geom_density() + 
   geom_vline(xintercept = quantile(time_chains$b.counts, probs = c(0.025,0.975)), color = 'red')
 ```
+
 There is a positive association between time studied and grade achieved
-For every hour of study, mean grade achieved increases by 7.8%
-There's a probability of 0.95 that study time increases mean grade achieved  by between 5.6, 7.8%
+For every 1 unit of increase in Study time, End of semester grade (G3) increases by 3.94
+The 95% credible interval for End of semester grade (G3) is from 2.47 to 5.24 change per unit increase in study time.

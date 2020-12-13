@@ -252,11 +252,6 @@ summary(studytime_sim)
 ```
 
 ```{r}
-#freq_poisson_model <- glm(studytime ~ G3, family = poisson(link = "log"), data = studentdata)
-#summary(freq_poisson_model)  
-```
-
-```{r}
 gelman.diag(studytime_sim)
 gelman.plot(studytime_sim[,1:3])
 autocorr.plot(studytime_sim[[1]][,1:3])

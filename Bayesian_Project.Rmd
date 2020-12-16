@@ -356,14 +356,11 @@ grade_model_mult <- "model{
 
     # Define the a, b, c, d and s priors
     a ~ dnorm(0, 50^(-2))
-    c ~ dnorm(3.94, 2.77^(-2))
-    d ~ dnorm(-0.13, 0.26^(-2))
+    c ~ dnorm(3.94, 2.77^(-2)) #studytime
+    d ~ dnorm(-0.13, 0.26^(-2)) #absences
     s ~ dunif(0, 20)
 }"  
 ```
-
-
-
 
 ```{r}
 # mean centre the grades and studytime 
@@ -374,32 +371,23 @@ grades_jags_mult <- jags.model(textConnection(grade_model_mult),
                         data = list(Y = studentdata$G3,
                                     X2 = studentdata$studytime, X3 = studentdata$absences), 
                         inits = list(.RNG.name="base::Wichmann-Hill",.RNG.seed = 1989))
-```
 
-
-
-
-
-
-```{r}
 # BURN IN the model
 grades_sim_mult <- update(grades_jags_mult,n.iter=10000)
 # SIMULATE the posterior    
 grades_sim_mult <- coda.samples(model=grades_jags_mult,
                                 variable.names=c("a","c","d","s"),
                                 n.iter=20000)
+
+plot(grades_sim_mult[[1]][,1], density = TRUE, main = "a")
+plot(grades_sim_mult[[1]][,2], density = TRUE, main = "c")
+plot(grades_sim_mult[[1]][,3], density = TRUE, main = "d")
+plot(grades_sim_mult[[1]][,4], density = TRUE, main = "s")
+
 ```
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for a, c, d and s. 
+The mean is approx.between 8 and 32 minutes. Whereas the standard deviation density follows roughly the same uniform distribution as before.From the summary function we see that standard error of the mean of the MCMC chain is 0.06. It is desirable to have a high ratio of meean to SE and that is what we have.
 
-
-
-
-
-```{r}
-plot(grades_sim_mult[[1]][,1], density = FALSE, main = "a")
-plot(grades_sim_mult[[1]][,2], density = FALSE, main = "c")
-plot(grades_sim_mult[[1]][,3], density = FALSE, main = "d")
-plot(grades_sim_mult[[1]][,4], density = FALSE, main = "s")
-```
 
 
 

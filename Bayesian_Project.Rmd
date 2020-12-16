@@ -294,8 +294,6 @@ The 95% credible interval for End of semester grade (G3) is from 2.47 to 5.24 ch
 
 
 ##grades per day missed
-
-
 ```{r}
 absence_model <- "model{
     # Likelihood model for Y[i]
@@ -355,7 +353,6 @@ ggplot(time_chains, aes(x = b.counts)) + geom_density() +
 
 
 ##Bayesian Multiple Regression
-
 ```{r}
 # DEFINE the model    
 grade_model_mult <- "model{

@@ -316,7 +316,7 @@ plot(absence_sim[[1]][,3], main = 's')
 
 summary(absence_sim)
 ```
-It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for both a, b and s, however the stability of both of them isn’t what we are looking for. The density plots are what we expected based on the prior we used. It is desirable to have a high ratio of meean to SE and that is what we have.
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for both a, b and s, however the stability of both of them isn’t what we are looking for. The density plots are what we expected based on the prior we used. It is desirable to have a high ratio of mean to SE and that is what we have.
 
 ```{r}
 gelman.diag(absence_sim)

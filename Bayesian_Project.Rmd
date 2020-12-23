@@ -202,12 +202,10 @@ ggplot(aes(x=sim,y=theta,color=as.factor(chain))) + geom_line() +
 ```{r}
 gelman.diag(grade_sim_multi)
 gelman.plot(grade_sim_multi)
+autocorr.plot(grade_sim)
 ```
 Here both m and s appear to converge to 1 at around the same rate. This is what we want in this case as it tells us that the chain have converged to the stationary distribution.
 
-```{r}
-autocorr.plot(grade_sim)
-```
 There is no correlation between the iterates of \(theta\), while there is minimal correlation for \(sigma\). 
 
 ```{r}
@@ -251,12 +249,9 @@ studytime_sim <- coda.samples(model=studytime_jags,
 plot(studytime_sim[[1]][,1], main = 'a')
 plot(studytime_sim[[1]][,2], main = 'b')
 plot(studytime_sim[[1]][,3], main = 's')
-```
-
-
-```{r}
 summary(studytime_sim)
 ```
+
 
 ```{r}
 gelman.diag(studytime_sim)
@@ -276,6 +271,9 @@ summary(studytime_sim)[2]
 
 ggplot(studytime_chains, aes(x = b)) + geom_density() + 
   geom_vline(xintercept = quantile(studytime_chains$b, probs = c(0.025,0.975)), color = 'red')
+
+Model_studytime <- dic.samples(model = studytime_jags ,n.iter=1000)
+
 ```
 
 There is a positive association between time studied and grade achieved
@@ -343,6 +341,56 @@ For every 1 unit of increase in absences, End of semester grade (G3) decreases b
 The 95% credible interval for End of semester grade (G3) is from -0.33 to 0.06 change per unit increase in absences.
 
 
+The results are as suspected. The more time free form school has an effect of grades. From the mean we see a drop of 1 for every unit of free time.
+95% credible interval tells us that the drop can be from -2.19 to -0.08 per unit increase in freetime.
+
+
+
+
+#Grades and Travel time
+```{r}
+goout_model <- "model{
+    # Likelihood model for Y[i]
+    for(i in 1:length(Y)) {
+      m[i] <- beta0 + beta1 * X[i]
+      Y[i] ~ dnorm(m[i], s^(-2))
+    }
+    # Define the a, b, s priors
+    beta0 ~ dnorm(0, 19^(-2)) 
+    beta1 ~ dnorm(2, 2.5^(-2))
+    s ~ dunif(0, 30)}"
+goout_jags <- jags.model(textConnection(goout_model), 
+                        data = list(Y = studentdata$G3, 
+                                    X = studentdata$goout), 
+                        n.chains = 4)
+# BURN IN the model
+goout_sim <- update(goout_jags, n.iter = 10000)
+# SIMULATE the posterior    
+goout_sim <- coda.samples(model=goout_jags,
+                         variable.names=c("beta0","beta1","s"),
+                         n.iter=20000,
+                         thin = 10)
+```
+```{r}
+plot(goout_sim[[1]][,1], main = 'beta0')
+plot(goout_sim[[1]][,2], main = 'beta1')
+plot(goout_sim[[1]][,3], main = 's')
+summary(traveltime_sim)
+```
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for both beta0, beta1 and s. The density plots are what we expected based on the prior we used. It is desirable to have a high ratio of mean to SE and that is what we have.
+
+
+Drop is 2.545 in grade for every unit time  unit time
+and the 95% CI is -4.12 to -0.96.
+
+```{r}
+gelman.diag(goout_sim)
+gelman.plot(goout_sim[,1:3])
+autocorr.plot(goout_sim[[1]][,1:3])
+```
+Here beta0 and beta1 appear to converge to 1 at around the same rate. This is what we want in this case as it tells us that the chain have converged to the stationary distribution. We can see there is no correlation for S.
+
+There is no correlation between the iterates of \(Beta 0\), \(Beta 1\) or \(s\)
 
 ###Bayesian Multiple Regression
 ```{r}
@@ -351,13 +399,13 @@ grade_model_mult <- "model{
     # Define model for data Y[i]
     for(i in 1:length(Y)) {
       Y[i] ~ dnorm(m[i], s^(-2))
-      m[i] <- a + c*X2[i] + d*X3[i]
+      m[i] <- beta0 + beta1*X1[i] + beta2*X2[i]
     }
 
     # Define the a, b, c, d and s priors
-    a ~ dnorm(0, 50^(-2))
-    c ~ dnorm(3.94, 2.77^(-2)) #studytime
-    d ~ dnorm(-0.13, 0.26^(-2)) #absences
+    beta0 ~ dnorm(0, 50^(-2))
+    beta1 ~ dnorm(3, 2.5^(-2)) #studytime
+    beta2 ~ dnorm(1, 2^(-2)) #absences
     s ~ dunif(0, 20)
 }"  
 ```
@@ -366,237 +414,90 @@ grade_model_mult <- "model{
 # COMPILE the model
 grades_jags_mult <- jags.model(textConnection(grade_model_mult), 
                         data = list(Y = studentdata$G3,
-                                    X2 = studentdata$studytime, X3 = studentdata$absences), 
-                        inits = list(.RNG.name="base::Wichmann-Hill",.RNG.seed = 1989),n.chains = 4)
+                                    X1 = studentdata$studytime, X2 = studentdata$absences), n.chains = 4)
 
 # BURN IN the model
 grades_sim_mult <- update(grades_jags_mult,n.iter=10000)
 # SIMULATE the posterior    
 grades_sim_mult <- coda.samples(model=grades_jags_mult,
-                                variable.names=c("a","c","d","s"),
+                                variable.names=c("beta0","beta1","beta2","s"),
                                 n.iter=20000)
 
-plot(grades_sim_mult[[1]][,1], density = TRUE, main = "a")
-plot(grades_sim_mult[[1]][,2], density = TRUE, main = "c")
-plot(grades_sim_mult[[1]][,3], density = TRUE, main = "d")
+plot(grades_sim_mult[[1]][,1], density = TRUE, main = "beta0")
+plot(grades_sim_mult[[1]][,2], density = TRUE, main = "beta1")
+plot(grades_sim_mult[[1]][,3], density = TRUE, main = "beta2")
 plot(grades_sim_mult[[1]][,4], density = TRUE, main = "s")
 
 ```
-It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for a, c, d and s. Whereas the standard deviation density follows roughly the same uniform distribution as before. It is desirable to have a high ratio of meean to SE and that is what we have.
-
-
-
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for beta0, beta1, beta2 and s. Whereas the standard deviation density follows roughly the same uniform distribution as before. It is desirable to have a high ratio of mean to SE and that is what we have.
 
 ```{r}
 summary(grades_sim_mult)[1]
 summary(grades_sim_mult)[2]
 Model_1 <- dic.samples(model = grades_jags_mult ,n.iter=1000)
 ```
-For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.81.
-For every 1 unit of increase in absences, End of semester grade (G3) decreases by 1.05.
+For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.64.
+For every 1 unit of increase in absences, End of semester grade (G3) decreases by 0.1.
 
 #Studytime, Absences, freetime 
 ```{r}
 # DEFINE the model    
-grade_model_mult <- "model{
+grade_model_mult2 <- "model{
     # Define model for data Y[i]
     for(i in 1:length(Y)) {
       Y[i] ~ dnorm(m[i], s^(-2))
-      m[i] <- a + c*X2[i] + d*X3[i] + e*X3[i]
+      m[i] <- beta0 + beta1*X1[i] + beta2*X2[i] + beta3*X3[i]
     }
 
     # Define the a, b, c, d and s priors
-    a ~ dnorm(0, 50^(-2))
-    c ~ dnorm(3.94, 2.77^(-2)) #studytime
-    d ~ dnorm(-0.13, 0.26^(-2)) #absences
-    e ~ dnorm(-1, 0.26^(-2)) #freetime (after school)
+    beta0 ~ dnorm(0, 50^(-2))
+    beta1 ~ dnorm(3, 2.5^(-2)) #studytime
+    beta2 ~ dnorm(1, 2^(-2)) #absences
+    beta3 ~ dnorm(-1, 0.26^(-2)) #freetime (after school)
     s ~ dunif(0, 20)
 }"  
 ```
 
-Again, It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for a, c, d, e, and s. Whereas the standard deviation density follows roughly the same uniform distribution as before. 
+Again, It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for beta0, beta1, beta2, beta3, and s. Whereas the standard deviation density follows roughly the same uniform distribution as before. 
+
 ```{r}
-# mean centre the grades and studytime 
-#studentdata$G3 = (studentdata$G3 - mean(studentdata$G3))
-#studentdata$studytime = (studentdata$studytime - mean(studentdata$studytime)) 
 # COMPILE the model
-grades_jags_mult <- jags.model(textConnection(grade_model_mult), 
+grades_jags_mult2 <- jags.model(textConnection(grade_model_mult2), 
                         data = list(Y = studentdata$G3,
-                                    X2 = studentdata$studytime, X3 = studentdata$absences, X4 = studentdata$freetime), 
-                        inits = list(.RNG.name="base::Wichmann-Hill",.RNG.seed = 1989),n.chains = 4)
+                                    X1 = studentdata$studytime, X2 = studentdata$absences, X3 = studentdata$freetime), n.chains = 4)
 
 # BURN IN the model
-grades_sim_mult <- update(grades_jags_mult,n.iter=10000)
+grades_sim_mult2 <- update(grades_jags_mult2,n.iter=10000)
 # SIMULATE the posterior    
-grades_sim_mult <- coda.samples(model=grades_jags_mult,
-                                variable.names=c("a","c","d","e","s"),
+grades_sim_mult2 <- coda.samples(model=grades_jags_mult2,
+                                variable.names=c("beta0","beta1","beta2","beta3","s"),
                                 n.iter=20000)
 
-plot(grades_sim_mult[[1]][,1], density = TRUE, main = "a")
-plot(grades_sim_mult[[1]][,2], density = TRUE, main = "c")
-plot(grades_sim_mult[[1]][,3], density = TRUE, main = "d")
-plot(grades_sim_mult[[1]][,4], density = TRUE, main = "e")
-plot(grades_sim_mult[[1]][,5], density = TRUE, main = "s")
+plot(grades_sim_mult2[[1]][,1], density = TRUE, main = "beta0")
+plot(grades_sim_mult2[[1]][,2], density = TRUE, main = "beta1")
+plot(grades_sim_mult2[[1]][,3], density = TRUE, main = "beta2")
+plot(grades_sim_mult2[[1]][,4], density = TRUE, main = "beta3")
+plot(grades_sim_mult2[[1]][,5], density = TRUE, main = "s")
 
 ```
 ```{r}
-summary(grades_sim_mult)[1]
-summary(grades_sim_mult)[2]
+summary(grades_sim_mult2)[1]
+summary(grades_sim_mult2)[2]
 # Calculate the deviance and pD  
-Model_2 <- dic.samples(model = grades_jags_mult,n.iter=1000)
+Model_2 <- dic.samples(model = grades_jags_mult2,n.iter=1000)
 
 ```
 
-For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.81.
-For every 1 unit of increase in absences, End of semester grade (G3) decreases by 1.05.
-For every 1 unit increase in freetime, 
+For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.55.
+For every 1 unit of increase in absences, End of semester grade (G3) decreases by 0.11.
+For every 1 unit increase in freetime, End of semester grade (G3) decreases by 0.99.
 
 
 ```{r}
+Model_studytime
 Model_1
 Model_2
 ```
-
-
-
-
-
-
-
-
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
----------------------------------------------------------------------------
-
-
-
-
-#Absence and Free time
-```{r}
-freetime_model <- "model{
-    # Likelihood model for Y[i]
-    for(i in 1:length(Y)) {
-      m[i] <- a + b * X[i]
-      Y[i] ~ dnorm(m[i], s^(-2))
-    }
-    # Define the a, b, s priors
-    a ~ dnorm(0, 19^(-2)) 
-    b ~ dnorm(0, 19^(-2))
-    s ~ dunif(0, 30)}"
-freetime_jags <- jags.model(textConnection(freetime_model), 
-                        data = list(Y = studentdata$G3, 
-                                    X = studentdata$freetime), 
-                        n.chains = 4)
-# BURN IN the model
-freetime_sim <- update(freetime_jags, n.iter = 10000)
-# SIMULATE the posterior    
-freetime_sim <- coda.samples(model=freetime_jags,
-                         variable.names=c("a","b","s"),
-                         n.iter=20000,
-                         thin = 10)
-```
-```{r}
-plot(absence_sim[[1]][,1], main = 'a')
-plot(absence_sim[[1]][,2], main = 'b')
-plot(absence_sim[[1]][,3], main = 's')
-summary(freetime_sim)
-```
-The results are as suspected. The more time free form school has an effect of grades. From the mean we see a drop of 1 for every unit of free time.
-95% credible interval tells us that the drop can be from -2.19 to -0.08 per unit increase in freetime.
-
-
-#Grades and Travel time
-```{r}
-traveltime_model <- "model{
-    # Likelihood model for Y[i]
-    for(i in 1:length(Y)) {
-      m[i] <- a + b * X[i]
-      Y[i] ~ dnorm(m[i], s^(-2))
-    }
-    # Define the a, b, s priors
-    a ~ dnorm(0, 19^(-2)) 
-    b ~ dnorm(0, 19^(-2))
-    s ~ dunif(0, 30)}"
-traveltime_jags <- jags.model(textConnection(traveltime_model), 
-                        data = list(Y = studentdata$G3, 
-                                    X = studentdata$traveltime), 
-                        n.chains = 4)
-# BURN IN the model
-traveltime_sim <- update(traveltime_jags, n.iter = 10000)
-# SIMULATE the posterior    
-traveltime_sim <- coda.samples(model=traveltime_jags,
-                         variable.names=c("a","b","s"),
-                         n.iter=20000,
-                         thin = 10)
-```
-```{r}
-plot(absence_sim[[1]][,1], main = 'a')
-plot(absence_sim[[1]][,2], main = 'b')
-plot(absence_sim[[1]][,3], main = 's')
-summary(traveltime_sim)
-```
-Drop is 2.545 in grade for every unit time  unit time
-and the 95% CI is -4.12 to -0.96.
-
-```{r}
-# DEFINE the model    
-TravelandFreetime_model_mult <- "model{
-    # Define model for data Y[i]
-    for(i in 1:length(Y)) {
-      Y[i] ~ dnorm(m[i], s^(-2))
-      m[i] <- a + c*X2[i] + d*X3[i]
-    }
-    # Define the a, b, c, d and s priors
-    a ~ dnorm(0, 50^(-2))
-    c ~ dnorm(-1, 2.11^(-2)) #free time
-    d ~ dnorm(-2.545, 3.16^(-2)) #travel time
-    s ~ dunif(0, 20)
-}"  
-```
-
-```{r}
-TravelandFreetime_jags_mult <- jags.model(textConnection(TravelandFreetime_model_mult), 
-                        data = list(Y = studentdata$G3,
-                                    X2 = studentdata$freetime, X3 = studentdata$traveltime), 
-                        inits = list(.RNG.name="base::Wichmann-Hill",.RNG.seed = 1989))
-# BURN IN the model
-TravelandFreetime_sim_mult <- update(TravelandFreetime_jags_mult,n.iter=10000)
-# SIMULATE the posterior    
-TravelandFreetime_sim_mult <- coda.samples(model=TravelandFreetime_jags_mult,
-                                variable.names=c("a","c","d","s"),
-                                n.iter=20000)
-plot(TravelandFreetime_sim_mult[[1]][,1], density = TRUE, main = "a")
-plot(TravelandFreetime_sim_mult[[1]][,2], density = TRUE, main = "c")
-plot(TravelandFreetime_sim_mult[[1]][,3], density = TRUE, main = "d")
-plot(TravelandFreetime_sim_mult[[1]][,4], density = TRUE, main = "s")
-```
-
-```{r}
-summary(TravelandFreetime_sim_mult)[1]
-summary(TravelandFreetime_sim_mult)[2]
-```
-Chains are stable and dense. 
-Chains A  abd C have small gaps but overallo they are well mix, C and D have almost no Gaps this indicates that the means we choose are well centered
-The means and SE are have high ratios whitch is a good thing
-avrg effect of freetime on grades is from -2.29 to -0.12 decrease in grades and 
-avrg effect of travel time on grades is -4.23 to -1.17 decrease in grades
-
-
-
-to compare this with our first found
-free time: Drop is -2.19 to -0.08  per unit time
-travel time; Drop is -4.12 to -0.96 per unit time
-
-which confirms out chosen priors were accurate
-
-
-
-
-
-
-
+The penalized deviance is lower for model_studytime and model_1, suggesting a better fit
+The penalty is lower for model 1, suggesting a simpler model
+Combining these, The DIC is lower for model_2 so It is the preferred model.

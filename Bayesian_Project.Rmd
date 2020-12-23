@@ -509,4 +509,11 @@ Model_1: G3 ~ Studytime + Absences
 Model_2: G3 ~ Studytime + Absences + Freetime
 We have found that Model_2 is the best model.
 
-Our aim was to create a model that can accurately predict end of year grades based on student information. Although we haven't tried models including every combination of variables from our dataset, we have tried three different models and shown the preferred model by using DIC. 
+Our aim was to create a model that can accurately predict end of year grades based on student information. Although we haven't tried models including every combination of variables from our dataset, we have tried three different models and shown the preferred model by using DIC.
+
+From our models we derive that factor as Sex, StudyTime, Absences, Freetime, and Travel time have impact on students final grade.
+We found out that Sex has not much impact on prediction grades model.
+Difference in grades between sex turns out to be only 0.9 difference in mean grade between males and females.
+From our presented models we found that variable FreeTime surprisingly has bigger impact on students fine year grade then variable such as Absences. 
+For every unit of time of increasing free time students loose around 1 of their grade. Where in absence for every increasing unit decrease of grade is only 1/10 of it (0.11).
+From this we can say that currant predicted grades model should not only consist of passed student grades from previous leaving cert year but also other factors such as they one we researched.

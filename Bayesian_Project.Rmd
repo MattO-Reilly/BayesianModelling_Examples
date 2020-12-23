@@ -19,9 +19,10 @@ library(ggpubr)
 ```
 
 ###Aim
-2020 marked the first-ever occurence of predicted grades for students in Ireland. The Irish Government had to provide an estimated mark across all subjects for each student in the country. There were many issues with their model.So, Using Bayesian Statistics and a dataset of student grades, we want to build a model that can predict an end of year grade from personal and academic characteristics.
+2020 marked the first-ever occurence of predicted grades for students in Ireland. The Irish Government had to provide an estimated mark across all subjects for each student in the country. There were many issues with their model.So, Using Bayesian Statistics and a dataset of student grades, we want to build a model that can predict an end of year grade from personal and academic characteristics. Our target population is all future students.
 
 Our objective is to create a model that can acuurately predict end of year grades based on student information. We will aim to use variables like Mock Examination Results, Gender, Study Time, Absences, Failures, and Parents Education to predict their end of year grade. 
+Our parameters of interest are G3 (End of semester grade), Sex, StudyTime, Absences, Freetime, and Travel time.
 
 ###Subjective Impression
 
@@ -45,8 +46,6 @@ studentdata[c("G1","G2","G3")] <- studentdata[c("G1","G2","G3")] * 5
 studentdata %>% summarise(N=n(), mean = mean(studentdata$G3), sd = sd(studentdata$G3))
 ```
 There are N=1044 students in our dataset, The mean final grade is 56.70977 while the standard deviation is 19.32398. With normal data, most of the observations are spread within 3 standard deviations on each side of the mean.
-
-
 
 #Defining prior
 ```{r}
@@ -88,8 +87,8 @@ mysims <- rnorm(10000, mean = Posterior[1], sd = Posterior[2])
 diff(quantile(mysims, probs = c(0.25,0.75)))
 ```
 
-
 ##Comparing Grades by Sex
+We'd like to see if there is a difference between grades for male and female students.
 ```{r}
 studentdata %>% group_by(sex) %>% summarise(mean = mean(G3), n = length(sex), sigma = sd(G3))
 
@@ -198,7 +197,7 @@ grade_chains_multi %>% filter(sim<1000) %>%
 ggplot(aes(x=sim,y=theta,color=as.factor(chain))) + geom_line() + 
   geom_smooth(aes(color=as.factor(chain)),se=FALSE)
 ```
-**Gelman-Rubin diagnostic**
+#Gelman-Rubin diagnostic
 ```{r}
 gelman.diag(grade_sim_multi)
 gelman.plot(grade_sim_multi)
@@ -210,13 +209,13 @@ There is no correlation between the iterates of \(theta\), while there is minima
 
 ```{r}
 ci95 <- quantile(grade_chains_multi$theta , probs = c(0.025 , 0.975))
-
 ggplot(grade_chains_multi , aes(x=theta)) + geom_density() + geom_vline(xintercept = ci95 , col = 'red' , lty = 'dashed')
 ```
 Here there is a 95% chance that the mean grade is between 55.54 and 57.87.
 
 
-##Bayesian Regression (Time spent studying and grades)
+
+###Bayesian Regression (Time spent studying and grades)
 ```{r}
 studytime_model <- "model{
     # Likelihood model for Y[i]
@@ -375,13 +374,13 @@ goout_sim <- coda.samples(model=goout_jags,
 plot(goout_sim[[1]][,1], main = 'beta0')
 plot(goout_sim[[1]][,2], main = 'beta1')
 plot(goout_sim[[1]][,3], main = 's')
-summary(traveltime_sim)
+summary(goout_sim)
 ```
 It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for both beta0, beta1 and s. The density plots are what we expected based on the prior we used. It is desirable to have a high ratio of mean to SE and that is what we have.
 
 
-Drop is 2.545 in grade for every unit time  unit time
-and the 95% CI is -4.12 to -0.96.
+For every 1 unit of increase in Travel time, End of semester grade (G3) decreases by 1.35.
+95% credible interval tells us that the drop can be from -2.34 to -0.38 per unit increase in freetime.
 
 ```{r}
 gelman.diag(goout_sim)
@@ -436,7 +435,7 @@ summary(grades_sim_mult)[1]
 summary(grades_sim_mult)[2]
 Model_1 <- dic.samples(model = grades_jags_mult ,n.iter=1000)
 ```
-For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.64.
+For every 1 unit of increase in studytime, End of semester grade (G3) increases by 3.65.
 For every 1 unit of increase in absences, End of semester grade (G3) decreases by 0.1.
 
 #Studytime, Absences, freetime 
@@ -501,3 +500,6 @@ Model_2
 The penalized deviance is lower for model_studytime and model_1, suggesting a better fit
 The penalty is lower for model 1, suggesting a simpler model
 Combining these, The DIC is lower for model_2 so It is the preferred model.
+
+
+###Conclusion

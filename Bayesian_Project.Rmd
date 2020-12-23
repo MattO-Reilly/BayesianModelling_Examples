@@ -160,7 +160,7 @@ mean(grade_chains$sigma)
 mean(grade_chains$theta)
 range(grade_chains$theta)
 ```
-It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). From our trace plots for Sigma and Theta we can see they have no patterns and there is good mixing, this indicates that they are stable. The density plots are also normally distributed. From the summary function we see that standard error of the mean of the MCMC chain is 0.004. It is desirable to have a high ratio of meean to SE and that is what we have. The mean grade is appoximately between 54.8 and 58.5, Whereas the standard deviation density follows roughly the same uniform distribution as before
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). From our trace plots for Sigma and Theta we can see they have no patterns and there is good mixing, this indicates that they are stable. The density plots are also normally distributed. From the summary function we see that standard error of the mean of the MCMC chain is 0.004. It is desirable to have a high ratio of mean to SE and that is what we have. The mean grade is approximately between 54.8 and 58.5, Whereas the standard deviation density follows roughly the same uniform distribution as before
 
 #Running multiple chains
 ```{r}

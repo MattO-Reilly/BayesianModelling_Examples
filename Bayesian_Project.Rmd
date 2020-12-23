@@ -21,7 +21,7 @@ library(ggpubr)
 ###Aim
 2020 marked the first-ever occurence of predicted grades for students in Ireland. The Irish Government had to provide an estimated mark across all subjects for each student in the country. There were many issues with their model.So, Using Bayesian Statistics and a dataset of student grades, we want to build a model that can predict an end of year grade from personal and academic characteristics. Our target population is all future students.
 
-Our objective is to create a model that can acuurately predict end of year grades based on student information. We will aim to use variables like Mock Examination Results, Gender, Study Time, Absences, Failures, and Parents Education to predict their end of year grade. 
+Our objective is to create a model that can accurately predict end of year grades based on student information. We will aim to use variables like Mock Examination Results, Gender, Study Time, Absences, Failures, and Parents Education to predict their end of year grade. 
 Our parameters of interest are G3 (End of semester grade), Sex, StudyTime, Absences, Freetime, and Travel time.
 
 ###Subjective Impression
@@ -503,3 +503,10 @@ Combining these, The DIC is lower for model_2 so It is the preferred model.
 
 
 ###Conclusion
+Of the three models we have run;
+Model_studytime: G3 ~ Studytime
+Model_1: G3 ~ Studytime + Absences
+Model_2: G3 ~ Studytime + Absences + Freetime
+We have found that Model_2 is the best model.
+
+Our aim was to create a model that can accurately predict end of year grades based on student information. Although we haven't tried models including every combination of variables from our dataset, we have tried three different models and shown the preferred model by using DIC. 

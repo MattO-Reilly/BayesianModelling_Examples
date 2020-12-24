@@ -160,7 +160,7 @@ mean(grade_chains$sigma)
 mean(grade_chains$theta)
 range(grade_chains$theta)
 ```
-It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). From our trace plots for Sigma and Theta we can see they have no patterns and there is good mixing, this indicates that they are stable. The density plots are also normally distributed. From the summary function we see that standard error of the mean of the MCMC chain is 0.004. It is desirable to have a high ratio of mean to SE and that is what we have. The mean grade is approximately between 54.8 and 58.5, Whereas the standard deviation density follows roughly the same uniform distribution as before
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). From our trace plots for Sigma and Theta we can see they have no patterns and there is good mixing, this indicates that they are stable. The density plots are also normally distributed. From the summary function we see that standard error of the mean of the MCMC chain is 0.004. It is desirable to have a high ratio of meean to SE and that is what we have. The mean grade is appoximately between 54.8 and 58.5, Whereas the standard deviation density follows roughly the same uniform distribution as before
 
 #Running multiple chains
 ```{r}
@@ -507,13 +507,7 @@ Of the three models we have run;
 Model_studytime: G3 ~ Studytime
 Model_1: G3 ~ Studytime + Absences
 Model_2: G3 ~ Studytime + Absences + Freetime
-We have found that Model_2 is the best model.
+We have found that Model_2 is the optimal model.
 
 Our aim was to create a model that can accurately predict end of year grades based on student information. Although we haven't tried models including every combination of variables from our dataset, we have tried three different models and shown the preferred model by using DIC.
-
-From our models we derive that factor as Sex, StudyTime, Absences, Freetime, and Travel time have impact on students final grade.
-We found out that Sex has not much impact on prediction grades model.
-Difference in grades between sex turns out to be only 0.9 difference in mean grade between males and females.
-From our presented models we found that variable FreeTime surprisingly has bigger impact on students fine year grade then variable such as Absences. 
-For every unit of time of increasing free time students loose around 1 of their grade. Where in absence for every increasing unit decrease of grade is only 1/10 of it (0.11).
-From this we can say that currant predicted grades model should not only consist of passed student grades from previous leaving cert year but also other factors such as they one we researched.
+Where our preferred model is,  G3 ~ Studytime + Absences + Freetime. Given more time, We would like to split the dataset in two, so that we could use one part to train our model and the other to test it. This would allow us to try and build a model to accurately predict grades for leaving cert students. 

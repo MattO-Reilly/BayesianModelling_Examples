@@ -50,7 +50,6 @@ There are N=1044 students in our dataset, The mean final grade is 56.70977 while
 #Defining prior
 ```{r}
 m0 <- 60
-se <- 19.32398/sqrt(1044)
 s0 <- 1 #Sigma_0 (Using a larger value for sigma_0 to allow for extra variation in Final Grade)
 ```
 
@@ -111,7 +110,7 @@ Posterior2_M <- normal_update(Prior, Grades_Male)
 
 many_normal_plots(list(Prior,Posterior1_F,Posterior2_M)) + theme(legend.position = c(0.75,0.75))
 ```
-From the plot above, The Blue curve is our prior. The red curve represents the average final grade of male students, which has a mode of 57.0651757. The green distribution represents the average final grade of female students, which has a mode of 57.9685636.
+From the plot above, The Blue curve is our prior. The red curve represents the average final grade of male students, which has a mode of 56.7. The green distribution represents the average final grade of female students, which has a mode of 57.7.
 
 #Estimate Mean and SD using rjags
 ```{r}
@@ -225,8 +224,8 @@ studytime_model <- "model{
     }
 
     # Define the a, b, s priors
-    a ~ dnorm(0, 19^(-2))
-    b ~ dnorm(0, 19^(-2))
+    a ~ dnorm(50, 25^(-2))
+    b ~ dnorm(2, 1^(-2))
     s ~ dunif(0, 30)}"
 
 studytime_jags <- jags.model(textConnection(studytime_model), 
@@ -250,6 +249,7 @@ plot(studytime_sim[[1]][,2], main = 'b')
 plot(studytime_sim[[1]][,3], main = 's')
 summary(studytime_sim)
 ```
+For every 1 unit increase in Time spent studying the End of semester grade (G3) increases by 3.165.
 
 
 ```{r}
@@ -276,8 +276,8 @@ Model_studytime <- dic.samples(model = studytime_jags ,n.iter=1000)
 ```
 
 There is a positive association between time studied and grade achieved
-For every 1 unit of increase in Study time, End of semester grade (G3) increases by 3.94
-The 95% credible interval for End of semester grade (G3) is from 2.47 to 5.24 change per unit increase in study time.
+For every 1 unit of increase in Study time, End of semester grade (G3) increases by 3.165
+The 95% credible interval for End of semester grade (G3) is from 2.01 to 4.28 change per unit increase in study time.
 
 
 ##grades per day missed

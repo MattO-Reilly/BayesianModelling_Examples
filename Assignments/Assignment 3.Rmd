@@ -24,7 +24,6 @@ It rains a lot in Galway. How often do you think it rains? Let's set up a Bayesi
 
   
 (a) Select (**with justification**) an appropriate prior distribution for $\theta$, the **proportion** of days that it rains in Galway. Summarise this prior using an appropriate plot.
-(**5 marks**
 
 I specified my prior using the 0.50 and the 0.90 quantiles. From intuition I asssigned appropriate values to my p50 and p90 (where p50 represents the 0.50 quantile for $\theta$ meaning it is equally likely to be smaller or larger than p50 and p90 represents the 0.90 quantile for $\theta$ meaning it is likely with probability 0.90 to be smaller than p90). 
 
@@ -297,10 +296,5 @@ quantile(my_sims, probs = c(0.025, 0.975))
 Like our other examples, the 95% probability interval obtained from simulating 10,000 observations is very close to the interval we obtained earlier. We observe that the upper and lower quartiles generated from the simulated data are approximately equal to the upper and lower quartiles we found earlier. We expect as the number of simulations increases we will obtain an interval closer in value to that of the one we obtained earlier.
 
 [**Q3 = 50 marks**]
-
-```{r  question3}
-
-
-```
 
 [**Total marks = 150**]

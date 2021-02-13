@@ -1,0 +1,222 @@
+---
+title: "Assignment 4"
+author: "Matt O'Reilly"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(knitr)
+library(LearnBayes)
+library(dplyr)
+library(ggplot2)
+source("TeachBayes.r") ## put the TeachBayes.r file in the same folder as this Rmd file
+```
+
+Complete Assignment 4 using this R markdown file, building a report on each of the statistical analyses. Submit your final report via TurnItIn to Blackboard **in Microsoft Word format**. This Assignment counts as 10% of the module grade.
+
+## Question 1
+Let's see if the weather is any better. In this question, you'll compare the probability of rain now to your estimate from Assignment 3. We'll treat each day as independent and suggest that $X$, the number of days it rains in Galway, follows a Binomial distribution, i.e. $X \sim Bin(n,\theta)$.
+
+(a) Choose a continuous prior distribution for the probability $\theta$, and justify your choice. Use the same prior for both groups so that any observed differences can be attributed to the data. Summarise this prior using an appropriate plot. [If you are still happy with the prior from Assignment 3 then feel free to use it again here.] (**3 marks**)
+```{r}
+p50 <- list(x = 0.7, p = 0.5)
+p90 <- list(x = 0.9, p = 0.9)
+my_shapes <- beta.select(p50,p90)
+my_shapes
+beta_draw(my_shapes)
+
+prior_par <- c(my_shapes[1], my_shapes[2])
+```
+I decided to increase both my p50 and p90 slightly because as we progress further into winter I think that it rains more often than I had originally thought in Assignment 3.
+
+(b) Once again, collect data on rain in Galway over the course of several days. Let $n_2$ be the new total number of days on which you collect data, and $x_2$ be the new total number of days with rain. Let the old data from Assignment 3 involve $x_1$ days of rain out of $n_1$ total days. Create a vector of data parameters for each group in `R` and use this to update your prior distribution into two posteriors, $\theta_1 = \theta|X_1$ and $\theta_2 = \theta|X_2$. Plot and interpret the posteriors. (**12 marks**)
+```{r}
+n_1 = 11
+x_1 = 7
+data1 <- c(7,4)
+
+n_2 = 11
+x_2 = 9
+data2 <- c(9,2)
+
+Posterior1 <- prior_par + data1
+Posterior1
+
+Posterior2 <- prior_par + data2
+Posterior2
+
+beta_prior_post(Posterior1,Posterior2)
+```
+Posterior1 (Prior) has shifted to the right and become more narrow indicating that it is a more accurate distribution than before we included the data. In this graph we can see Posterior2 has shifted further to the right and become slightly more narrow than our Posterior1 (Prior) plot. This means the number of days it rains is more than we originally thought based on the data we collected. It rains 9 out of 11 days we made observations.
+
+(c) Simulate data from each posterior and use this **to obtain and plot** a posterior distribution for the difference $(\theta_1-\theta_2)|X$. Interpret the distribution of the difference. (**8 marks**)
+```{r}
+sim1 <- rbeta(10000, shape1 = Posterior1[1], shape2 = Posterior1[2])
+sim2 <- rbeta(10000, shape1 = Posterior2[1], shape2 = Posterior2[2])
+simDiff <- sim1 - sim2
+plot(density(simDiff))
+```
+The distribution of the difference in the means of the Prior - Posterior is very close to symmetrical and centred just left of zero (roughly at -0.1). This tells us based on our data that the Posterior has slightly more days on which it rains than the Prior.
+
+(d) Calculate and interpret a 95% credible interval for $(\theta_1-\theta_2)|X$ (**8 marks**)
+```{r}
+quantile(simDiff, probs = c(0.025, 0.975))
+```
+From this confidence interval we can say that the probability for $(\theta_1-\theta_2)|X$ lies between (`r quantile(simDiff, probs = c(0.025, 0.975))[1]`,`r quantile(simDiff, probs = c(0.025, 0.975))[2]`) with 95% confidence. Due to the greater share of the interval being in the negative. This tells us that in general the Posterior will have more rainy days than the Prior.
+
+(e) What is the probability that $\theta_1>\theta_2$, i.e. that the probability of rain has decreased since Assignment 3? (**4 marks**)
+```{r}
+sum(simDiff>0)/length(simDiff)
+```
+The probability rain has decreased since Assignment 1 is `r sum(simDiff>0)/length(simDiff)`
+
+[**Q1 = 35 marks**]
+
+## Question 2
+Board members from a local University (let's call it University A) believe that they're underpaid. We've been asked to compare the average board member salary between three Universities (A, B and C). Let's assume that the salary of a University board member (**in units of €1000**) $X$ follows a Normal distribution with unknown mean $\theta$ and known variance $\sigma^2=10^2$.
+
+(a) Choose a Normal prior distribution for the mean salary $\theta\sim N(\mu_0,\sigma_0^2)$ (**in units of €1000**). You can use the same prior for both Universities so that any differences we observe can be solely attributed to the data. (**3 marks**)
+```{r}
+mu0 <- 130
+sd0 <- 10
+```
+
+You now observe the following data of salaries (**in units of €1000**) from the boards of Universities A, B and C. The `Board` data are contained in the `BSDA` package, which you'll need to install before continuing.
+
+```{r}
+library(BSDA)
+Board
+mean(Board$salary)
+```
+
+(b) Summarise the data for each group and use these summary statistics to update your prior distribution into three posteriors: $\theta_A = \theta|X_A$, $\theta_B = \theta|X_B$ and $\theta_C = \theta|X_C$. Plot the prior and three posterior distributions together and interpret this plot. (**10 marks**)
+```{r}
+salary_A <- filter(Board, Board$university == 'A')
+salary_B <- filter(Board, Board$university == 'B')
+salary_C <- filter(Board, Board$university == 'C')
+
+meanA<-mean(salary_A$salary)
+meanB<-mean(salary_B$salary)
+meanC<-mean(salary_C$salary)
+
+meanA
+meanB
+meanC
+
+sigma <- 10
+se <- sigma/sqrt(length(salary_A$salary))
+
+prior <- c(mu0,sd0)
+dataA <- c(meanA,se)
+dataB <- c(meanB,se)
+dataC <- c(meanC,se)
+
+postA <- normal_update(prior,dataA)
+postB <- normal_update(prior,dataB)
+postC <- normal_update(prior,dataC)
+
+many_normal_plots(list(prior,postA,postB,postC))
+```
+
+
+From the plot, we can see that the Green curve is our prior. The blue curve represents the average salary of those in group A, which is just slightly right of the prior belief. The red curve (which represents the average salary of those in group B) has the lowest average salary. The purple distribution represents the average salary of those in group C which is to the far right of the other curves. This indicates that it has the highest mean salary. This is affected by the two outliers in the data set for group C.
+
+(c) Use the posterior parameters together with the properties of the Normal distribution to work out both $(\theta_A-\theta_B)|X$ and $(\theta_A-\theta_C)|X$. Plot the two resulting posterior distributions of the difference in means, and interpret these densities. (**8 marks**)
+```{r}
+meanAB <- meanA - meanB
+meanAC <- meanA - meanC
+meanAB
+meanAC
+
+postAB <- c(meanAB,sqrt(se^2+se^2))
+postAC <- c(meanAC, sqrt(se^2 + se^2))
+many_normal_plots(list(postAB , postAC))
+```
+The distribution of the difference in A and B is greater than zero telling us that mean salary of those in group A is greater than that of those in group B. However, the distribution of the difference in A and C is approximately -282. Showing that the mean salary of those in group C is much higher than group A and even more so in group B.
+
+(d) Calculate, plot and interpret 95% credible intervals for $(\theta_A-\theta_B)|X$ and $(\theta_A-\theta_C)|X$ separately (**8 marks**)
+```{r}
+lowertailAB <- qnorm(0.025,mean= meanAB,sd=postAB[2])
+uppertailAB <- qnorm(0.975,mean= meanAB,sd=postAB[2])
+intervalAB <- c(lowertailAB , uppertailAB)
+intervalAB
+
+lowertailAC <- qnorm(0.025 , mean = meanAC , sd=postAC[2])
+uppertailAC <- qnorm(0.975 , mean = meanAC , sd=postAC[2])
+intervalAC <- c(lowertailAC,uppertailAC)
+intervalAC
+
+normal_interval(0.95 , postAB)
+normal_interval(0.95 , postAC)
+```
+Here we can see for the difference A-B, our 95% interval is (15.238,36.191). Whereas for A-C the interval is (-292.619,-271.666). Showing A members earn slightly moe than those in B. However those in C earn a lot more than those in A and B.
+
+(e) Are there any issues with the data? Test whether resolving these issues alters your inferences from part **d**. (**6 marks**)
+```{r}
+newC <- c(100,133.57,300,90,107.85,260,60)
+mean_newC <- sum(newC) / length(newC)
+new_dataC <- c(mean_newC , se)
+new_postC <- normal_update(prior , new_dataC)
+new_meanAC <- meanA - mean_newC
+new_postAC <- c(new_meanAC , sqrt(se^2 + se^2))
+lowerquartile <- qnorm(0.025 , mean = new_meanAC , sd = new_postAC[2])
+upperquartile <- qnorm(0.975 , mean = new_meanAC , sd = new_postAC[2])
+new_interval <- c(lowerquartile,upperquartile)
+new_interval
+
+normal_interval(0.95 , new_postAC)
+```
+
+Yes, there is an issue with the data. There are two large outliers in the salaries in group C. The two outliers being 1200 and 900. These are causing huge negative mean values for my posterior distribution of the difference in means of A-C.
+I replaced the extreme outliers in C with the means of the A and B groups. This results in a massive right-shift for the difference. Which is as to expected based on the alterations made. The resulting negative interval tells us that despite the adjustments, the C group still have a higher mean salary than those in group A.
+
+[**Q2 = 35 marks**]
+
+
+
+## Question 3
+You've been asked by a local car insurance company to help estimate the number of claims they receive per month. The number of claims per month $X$ will be a count variable, and we assume it follows a Poisson distribution with some mean rate of $\theta$ claims per month. You'd like to answer this question using a Bayesian approach, but let's say your prior knowledge of monthly insurance claims is limited. Without much prior knowledge, a **non-informative prior** will be a useful starting point to let the data speak for themselves.
+
+(a) Simulate $\theta$ values from a suitable Uniform prior and simulate a count of insurance claims for each $\theta$. Combine these simulated data into a data frame and plot the resulting distributions of $\theta$ for each simulated count of insurance claims. [Hint: the `geom_density_ridges` function in the `ggridges` package might be useful] (**8 marks**)
+```{r}
+theta <- runif(10000, 0 , 100)
+n_claims <- rpois(10000, lambda = theta)
+simulation <- data.frame(theta,n_claims)
+library(ggplot2)
+library(ggridges)
+ggplot(simulation,aes(x=theta,y=n_claims,group=n_claims)) + geom_density_ridges()
+
+```
+I used intuition to estimate that an insurance company would receive between 0 and 100 claims per month.
+
+(b) After a month, you observe 29 insurance claims. Use grid approximation to calculate a posterior distribution for $\theta|X$. Plot and interpret this posterior distribution. (**10 marks**)
+```{r}
+likelihood_29 <- simulation %>%  filter(n_claims == 29)
+ggplot(likelihood_29 ,aes(x=theta)) + geom_density()  + lims(x=c(0,60))
+
+```
+We can see from the posterior plot that the mean rate of claims per month is going to be approximately somewhere between 12 and 58, with the mode occurring at roughly 28.
+
+(c) Calculate, plot and interpret a 95% credible interval for the mean rate of claims per month. [Hint: `geom_vline`] (**8 marks**)
+```{r}
+quant <- quantile(likelihood_29$theta , probs = c(0.025,0.975))
+quant
+
+ggplot(likelihood_29,aes(x=theta)) + geom_density() + geom_vline(color = 'red',xintercept = quant)  + xlim(c(0,60))
+
+```
+From this credible interval we can say that the mean rate of claims per month lies between (`r quant[1]`, `r quant[2]`) with 95% confidence.
+
+(d) What is the probability that the mean number of claims is over 40 per month, i.e. $P(\theta>40)$? (**4 marks**)
+```{r}
+sum(likelihood_29$theta>40)/length(likelihood_29$theta)
+```
+The probability that the mean rate of claims is more than 40 per month based on the current simulation and the data and prior we have is approximately 5%.
+
+[**Q3 = 30 marks**]
+
+[**Total marks = 100**]

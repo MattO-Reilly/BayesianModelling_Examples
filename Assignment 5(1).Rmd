@@ -1,0 +1,548 @@
+---
+title: "Assignment 5"
+author: "Matt O'Reilly"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, fig.height=4)
+options(htmltools.dir.version = FALSE, scipen = 5)
+library(ggplot2)
+```
+
+Complete Assignment 5 using this `R` markdown file, building a report on each of the three statistical analyses. Submit your final report via TurnItIn to Blackboard **in Microsoft Word format**. This Assignment counts as 15% of the module grade.
+
+[JAGS](http://mcmc-jags.sourceforge.net/) is a free software program to implement MCMC sampling. If you are using your own laptop, you'll need to [follow this link](https://sourceforge.net/projects/mcmc-jags/files/) to **install JAGS for yourself**. Once it is installed, **you can use JAGS in `R` through the `rjags` library**. 
+
+# Part A
+
+## Question 1
+In this question you'll use `rjags` to simulate a posterior using Markov Chain Monte Carlo methods, and make inferences from this distribution. 
+
+We're back to flight data, but rather than another trip to Knock we've got lots of data from New York. We're interested in estimating the mean time of arrival delays $X$. Some flights will land on time (i.e. $x=0$), some will be delayed ($x>0$) and some will land ahead of time ($x<0$). Let's assume that the mean time of arrival delay follows a Normal distribution $X \sim N(\theta,\sigma^2)$ where both $\theta$ and $\sigma$ are unknown. You need to estimate both $\theta$ and $\sigma$.
+
+(a) 
+
+```{r, echo = FALSE}
+library(dplyr)
+library(rjags)
+library(nycflights13)
+my_data <- flights[1:1000,]
+```
+
+The `nycflights13` package contains data about `r dim(flights)[1]` flights leaving New York airports in `r min(flights$year)`. Running all these data would take some time, so use the `my_data` data frame (containing just the first 1000 rows of data) for this question. 
+
+Choose a suitable prior distribution for the mean $\theta$ of arrival delay times and another prior for the standard deviation $\sigma$ of arrival delay times. Simulate data from these prior distributions and use an appropriate plot to summarise them. (**4 marks**)
+
+```{r, question1a}
+p.theta <- rnorm(1000, 20, sd = 4)
+p.sigma <- runif(1000, 0, 20)
+plot(density(p.theta))
+plot(density(p.sigma))
+```
+
+(b) Define the `rjags` model, including specification of your likelihood distribution and your prior distributions. (**4 marks**)
+
+```{r, question1b}
+delays <- "model{for(i in 1:length(X)) {X[i] ~ dnorm(m, s^(-2))}
+m ~ dnorm(20 , 4^(-2))
+s ~ dunif(0,20)
+}"
+
+```
+
+(c) Compile the model by **specifying the correct variables** from my_data and setting initial values. (**4 marks**)
+
+```{r, question1c}
+arrival_delays <- my_data[9]
+delays_jags <- jags.model(textConnection(delays) , data = list(X = list(arrival_delays)) , inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 100))
+
+```
+
+(d) Simulate 1000 values from the `rjags` model using a single chain. Summarise and interpret the resulting simulated posteriors. You should include and discuss trace plots, density plots and MCMC standard errors.  (**12 marks**)
+
+```{r, question1d}
+sim_delay <- update(delays_jags, n.ter = 1000)
+sim_delay <- coda.samples(model = delays_jags , variable.names = c("m" , "s") , n.iter = 10000)
+plot(sim_delay)
+summary(sim_delay)
+```
+It is desirable to have stability in the trace plot (no patterns), with good mixing (ie.chain traverses the parameter space without getting stuck or missing a section). Here the trace plots have good mixing for both d and t, however the stability of both of them isn’t what we are looking for. d is a small bit better than t which appears to be stable. The density plots are what we expected based on the prior we used. The mean is approx.between 8 and 32 minutes. Whereas the standard deviation density follows roughly the same uniform distribution as before.From the summary function we see that standard error of the mean of the MCMC chain is 0.06. It is desirable to have a high ratio of meean to SE and that is what we have.
+
+(e) Repeat the analysis with 1000 iterations using $m=4$ chains. Provide trace plots, a Gelman-Rubin plot and interpret the Gelman-Rubin statistic. (**6 marks**)
+
+```{r, question1e}
+delays_jags_multi <- jags.model(textConnection(delays),data = list(X = list(arrival_delays)) , n.chains = 4)
+
+sim_delay_multi <- update(delays_jags_multi , n.iter = 10000)
+sim_delay_multi <- coda.samples(model = delays_jags_multi , variable.names = c('m' , 's') , n.iter = 1000)
+head(sim_delay_multi)
+
+plot(sim_delay_multi)
+
+chains_multi <- data.frame(sim = rep(1:1000,4),
+                                chain = c(rep(1,1000),
+                                          rep(2,1000),
+                                          rep(3,1000),
+                                          rep(4,1000)),
+                                rbind(sim_delay_multi[[1]],
+                                      sim_delay_multi[[2]],
+                                      sim_delay_multi[[3]],
+                                      sim_delay_multi[[4]]))
+chains_multi %>% filter(sim<100) %>%
+ggplot(aes(x=sim , y=m,color=as.factor(chain))) + geom_line() + geom_smooth(aes(color=as.factor(chain)) , se = FALSE)
+
+gelman.diag(sim_delay_multi)
+gelman.plot(sim_delay_multi)
+```
+Here both m and s appear to converge to 1 at around the same rate. This is what we want in this case as it tells us that the chain have converged to the stationary distribution.
+
+(f) Calculate, plot and interpret a 95% credible interval fore $\theta$ the mean arrival delay time. (**6 marks**)
+
+```{r, question1f}
+ci95 <- quantile(chains_multi$m , probs = c(0.025 , 0.975))
+ci95
+ggplot(chains_multi , aes(x=m)) + geom_density() + geom_vline(xintercept = ci95 , col = 'red' , lty = 'dashed')
+```
+Here there is a 95% chance that out mean arrival delay time is somewhere between 12.07 and 28.08 minutes.
+
+(g) What is the probability that the mean arrival delay time is greater than 10 minutes, i.e.  $P(\theta>10)$? (**4 marks**)
+
+```{r, question1g}
+sum(chains_multi$m>10)/length(chains_multi$m)
+```
+The probability that the mean arrival delay time is greater than 10 minutes is `r sum(chains_multi$m>10)/length(chains_multi$m)*100`
+
+[**Q1 = 40 marks**]
+
+
+# Part B
+
+We'll now use the same dataset to answer three different questions. Of interest are the tips left after 95 meals. The data are available in the Datasets folder on Blackboard. You will need to download the `.csv` file and then read it in to your `RStudio` session as part of the Assignment by changing the filepath in the following script. If you save the data file in the same folder as this .Rmd file the code below will work when you knit.
+
+```{r}
+library("readr")
+library("readxl")
+
+tips_data <- read_excel("tip_data.xlsx")
+
+```
+
+## Question 2
+We'll first try to estimate the probability of getting a good tip (over 12.5%). A waiter can receive a good tip or not, so this is a Bernoulli process. With 95 meals available, the random variable $X$ (the number of of good tips) follows a Binomial distribution with parameter $\theta$ and $n=95$, i.e. $X\sim Binomial(n,\theta)$.
+
+(a) Some prior information from [an online poll](http://jrnl.ie/3332997) suggests that 5% of people leave tips of at least 12.5%. Based on these data, choose (**with justification**) and plot a suitable prior for $\theta$ (**3 marks**)
+
+```{r, question2a}
+p.theta <- rbeta(1000,5,95)
+plot(density(p.theta))
+```
+From the survey we see that 5% of people leave a tip of 12.5%. Therefore I chose alpha=5 and beta=95 as the survey has a large sample size and therefore I have confidence in the survey.
+
+(b) Define the model in `rjags`. You will need to set the likelihood of receiving a good tip and the prior distribution for your prior parameter $\theta$ (**7 marks**)
+
+```{r, question2b}
+model_tips <- "model{
+#Binomial likelihood for X
+X ~ dbin(p,n)
+#Prior for p
+p~ dbeta(5 , 95)
+}"
+
+```
+
+(c) Load the `rjags` library, read in the data from `tip_data.csv` and compile the model by attaching relevant data [Hint: the Lecture 16 election example should help here] and setting starting values (**3 marks**)
+
+```{r, question2c}
+tips_jags <- jags.model(textConnection(model_tips),
+                        data = list(X = 75, n = 95),
+                        inits = list(.RNG.name = 'base::Wichmann-Hill' , .RNG.seed = 100))
+```
+
+(d) Perform a burn-in sufficient to allow the model to converge (**1 mark**)
+
+```{r, question2d}
+tips_sim <- update(tips_jags , n.iter = 10000)
+```
+
+(e) Simulate values from the posterior distribution using the `coda.samples` function. Summarise your simulations using suitable plots and statistics. How did you decide on convergence? Include any useful plots and summary statistics that influenced your decision. (**7 marks**)
+
+```{r, question2e}
+
+tips_sim <- coda.samples(model = tips_jags,
+                         variable.names = c("p"),
+                         n.iter = 20000)
+
+summary(tips_sim)
+
+plot(tips_sim)
+
+tips_chains<- data.frame(tips_sim[[1]])
+
+tips_jags_multi <- jags.model(textConnection(model_tips),
+                              data = list(X = 75 , n = 95),
+                              n.chains = 4)
+
+tips_sim_multi <- update(tips_jags_multi , n.iter = 10000)
+
+tips_sim_multi <- coda.samples( model = tips_jags_multi,
+                                variable.names= c('p'),
+                                n.iter = 20000)
+plot(tips_sim_multi)
+summary(tips_sim_multi)
+gelman.diag(tips_sim_multi)
+gelman.plot(tips_sim_multi)
+autocorr.plot(tips_sim_multi)
+```
+The first trace plot here has good mixing and stability. The second trace plot which has multiple chains also has good stability and good mixing. 
+Looking at the Gelman-Rubin plot I can see that the chains converge to 1 around 15,000 iterations.
+All of the autocorrelation graphs show low autocorrelation which is desirable.
+
+(f) Provide and interpret a 95% credible interval for the probability of receiving a good tip (**6 marks**)
+
+```{r, question2g}
+ci_95<-quantile(tips_chains$p, probs=c(0.025,0.975))
+ci_95
+
+ggplot(tips_chains , aes(x=p)) + geom_density() + geom_vline(xintercept = ci_95 , col = 'red' , lty = 'dashed')
+```
+From this confidence interval we can say that the probability of getting a good tip lies between 0.342 amd 0.479 with 95% confidence.
+
+
+(g) What is the probability that $\theta>0.5$? (**3 marks**)
+
+```{r, question2h}
+sum(tips_chains$p>0.5)/length(tips_chains$p)
+```
+The probability that $\theta>0.5$ is 0.00585.
+
+[**Q2 = 30 marks**]
+
+
+
+## Question 3
+In this question, you will perform a linear regression model to find the association between predictor variables (bill, day of the week, group size) and the tip amount. You're interested in the relationship between the tip $Y$ and predictors bill amount $X_1$ (in euros), day of the week $X_2$ (a binary marker, weekday = 1 and weekend = 2) and group size $X_3$ (number of people). Linear regression can be used to investigate the relationship between $X_1,X_2,X_3$ and $Y$. 
+
+(a) First think about prior distributions for regression parameters. Let $\beta_0$ be the intercept, $\beta_1$ be the coefficient for the bill, $\beta_2$ be the coefficient for the day of the week, $\beta_3$ be the coefficient for the group size and $\sigma^2$ be the standard deviation of tips. Choose prior distributions for each parameter with a brief explanation for each choice. [Hint: if you are using non-informative priors it is OK to say so!] (**5 marks**)
+
+```{r, question3a} 
+library(openintro)
+
+ggplot(tips_data, aes(x=tip, y= people)) + geom_point()
+
+ggplot(tips_data, aes(x=tip, y= bill)) + geom_point()
+
+ggplot(tips_data, aes(x=tip, y= day)) + geom_point()
+
+model_people<-lm(tip~(people), tips_data)
+summary(model_people)
+
+model_bill<-lm(tip~(bill), tips_data)
+summary(model_bill)
+
+model_days<-lm(tip~(day), tips_data)
+summary(model_days)
+
+B0 <- rnorm(0,40)
+B1<-rnorm(0.17,0.07)
+B2<-rnorm(0,14)
+B3<-rnorm(2.4,1.1)
+s<-runif(0,12)
+```
+For B0 I have a non informative prior, I have chosen 0 for the mean and 40 for the sd as I have no prior information for these.
+From my analysis I can see that the tip changes by 0.17 per unit bill so I chose this as my mean and sd = 0.07.
+For B2 I used a non informative prior of 0 as my mean and 14 as my standard deviation. I used a non informative prior as i had a low R^2 for this model.
+For my B3 I used an informative prior, using the information from my model I chose 2.4 as my mean and 1.1 as my sd. 
+For s I chose my minimum to be 0 and my maximum to be 12
+
+(b) Define the model in `rjags` by stating the likelihood model for $Y$ and prior distributions for all required parameters (**7 marks**)
+
+```{r, question3b}
+tips_model_mult <- "model{
+#Model for the data Y[i]
+for(i in 1:length(Y)) {
+Y[i] ~ dnorm(m[i], s^(-2))
+m[i] <- B0 + B1*X1[i] + B2[X2[i]] + B3*X3[i]
+}
+#B0,B1,B2,B3,s priors
+B0 ~dnorm(0,40)
+B1~dnorm(0.17,0.07)
+B2[1]<-0
+B2[2]~dnorm(0,(10)^-2)
+B3~dnorm(2.4,1.1)
+s~dunif(0,12)
+}"
+```
+
+(c) Compile the model by setting starting values and attaching the data (**4 marks**)
+
+```{r, question3c}
+tips_jags_2 <- jags.model(textConnection(tips_model_mult), 
+                          data=list(Y=tips_data$tip, X1=tips_data$bill, X2=tips_data$day, X3=tips_data$people),
+                          inits=list(.RNG.name="base::Wichmann-Hill",.RNG.seed=1989))
+```
+
+(d) Perform a burn-in sufficient to allow the model to converge (**1 mark**)
+```{r, question3d}
+tips_sim_mult <- update(tips_jags_2, n.iter = 1000)
+```
+
+(e) Simulate from the posterior distributions, providing plots and summary statistics of the simulations. Comment on convergence. (**7 marks**)
+
+```{r, question3e}
+
+tips_sim_mult <- coda.samples(model = tips_jags_2 , variable.names = c('B0' , 'B1' , 'B2' , 'B3' , 's') , n.iter = 1000)
+plot(tips_sim_mult[[1]][,1], main="B0")
+plot(tips_sim_mult[[1]][,2], main="B1")
+plot(tips_sim_mult[[1]][,3], main="B21")
+plot(tips_sim_mult[[1]][,4], main="B22")
+plot(tips_sim_mult[[1]][,5], main="B3")
+plot(tips_sim_mult[[1]][,6], main="s")
+summary(tips_sim_mult)[1]$statistics
+summary(tips_sim_mult)[2]$quantile
+
+tips_jags_mult1 <- jags.model(textConnection(tips_model_mult), 
+data = list(Y = tips_data$tip, X1 = tips_data$bill, 
+X2 = tips_data$day, X3 = tips_data$people), 
+n.chains=4)
+
+
+
+
+tips_sim_mult1 <- update(tips_jags_mult1 , n.iter = 50000)
+
+tips_sim_mult1 <- coda.samples(model = tips_jags_mult1 , variable.names = c('B0' , 'B1', 'B2', 'B3' , 's'), n.iter = 50000)
+
+plot(tips_sim_mult1)
+gelman.diag(tips_sim_mult1,multivariate=FALSE)
+
+```
+The trace plots for B0, B2[2] and s have stability and adequate mixing.The trace plots for B1 and B3 do not have stability and good mixing.
+For each variable the gelman rubin statistic is 1. This implies that the chains have converged to a stationary distribution.
+
+(f) Use the output from `summary` to **find and interpret**
+
+i. an estimate for the effect of the bill on the average tip and its associated 95% credible interval
+ii. an estimate for the effect of the weekend on the average tip and its associated 95% credible interval
+iii. an estimate for the effect of the group size on the average tip and its associated 95% credible interval (**Total 9 marks**)
+
+i.
+```{r, question2f(i)}
+summary(tips_sim_mult1)
+mean_bill <- round(summary(tips_sim_mult1)[1]$statistics[2,1],2)
+mean_bill
+```
+
+For every unit increase in bill the tip given increases by 0.11.
+The credible interval tells us that the mean value of tips is between 0.05144 and 0.1621.
+
+ii.
+```{r, question2f(ii)}
+mean_day <- round(summary(tips_sim_mult1)[1]$statistics[4,1],2)
+mean_day
+```
+
+The mean of the average difference between weekdays and weekends is -0.49. Therefore there is evidence to suggest that customers may tip slightly less at the weekend than they do on weekdays.
+The credible interval tells us that the mean difference between weekdays and weekends is between -1.3312 and 0.3410 with 95% confidence.
+
+iii.
+```{r, question2f(iii)}
+mean_size <- round(summary(tips_sim_mult1)[1]$statistics[5,1],2)
+mean_size
+```
+For every unit increase in group size the tip goes up by 0.98 on average.
+From confidence interval we can say with 95% confidence that the mean value of the tip is between 0.2217 and 1.7675
+
+(g) Check for autocorrelation. Decide whether you need to adjust your simulation to handle autocorrelation. (**2 marks**)
+```{r, question3g}
+autocorr.plot(tips_sim_mult[1])
+
+
+tips_sim_thinning <- coda.samples(model= tips_jags_2 , variable.names = c('B0', 'B1', 'B2', 'B3', 's'), n.iter = 20000 , thin = 15)
+autocorr.plot(tips_sim_thinning)
+```
+The first set of graphs show a small amount of correlation between B0,B2[2],s. There is however a high correlation in B1 and B3.
+The second set of plots shows a reduced correlation between B1 and B3. Even though thinning has improved the correlation it is not as good as using all the iterations.
+
+(h) Obtain a prediction for the tip from a weekend meal among 4 people where the bill is 100 euro, including a 95% credible interval. Plot and interpret the interval. (**5 marks**)
+
+```{r, question3h}
+tips_chains <- data.frame(tips_sim_thinning[[1]])
+tips_chains <- tips_chains %>%
+mutate(m_97 = B0 + B1*100 + B2.2. + B3*4)
+
+ggplot(tips_chains, aes(x=m_97)) + geom_density()
+
+mean(tips_chains$m_97)
+
+quantile(tips_chains$m_97, c(0.025, 0.975))
+
+rnorm(n=1 , mean = tips_chains$m[1] , sd = tips_chains$s[1])
+
+rnorm(n=1 , mean = tips_chains$m_97[1] , sd = tips_chains$s[1])
+
+tips_chains <- tips_chains %>%
+  
+mutate(Y_97 = rnorm(n = length(tips_chains$m_97) , mean = m_97 , sd = s))
+
+head(tips_chains)
+
+ci_97 <- quantile(tips_chains$Y_97 , c(0.025 , .975))
+ci_97
+ggplot(tips_chains, aes(x = Y_97)) + geom_density() + geom_vline(xintercept = ci_97 , color = 'red')
+```
+This suggests that at the weekend a meal between 4 people with a bill of 100 would have a tip of 14.29 on average.The confidence interval says that the probability that the mean tip is between 9.17 and 19.39 is 0.95.
+
+[**Q3 = 40 marks**]
+
+
+## Question 4
+Now let's try to estimate the mean tip we might expect as a waiter. The data arise from three restaurants. That data structure has been ignored in both Questions 2 and 3. Here we'll take this into account using a **hierarchical model** to estimate the mean tip given. Let's assume that tips $X$ follow a Normal distribution with mean $\theta$ and standard deviation $\sigma$, i.e. $X\sim N(\theta,\sigma^2)$
+
+(a) Define the hierarchical model in `rjags`
+i. Set up the likelihood for tips, allowing a different $\theta$ and $\sigma$ for each restaurant
+ii. Choose suitable prior distributions for $\theta$ and $\sigma$
+iii. Use hyperparameters for the prior parameters, and choose suitable hyperpriors for these (**Total 8 marks**)
+
+```{r, question4a}
+ggplot(tips_data, aes(x=tip, y=restaurant)) + geom_point()
+
+res_model<- lm(tip ~ (restaurant), tips_data)
+summary(res_model)
+
+
+tips_modelq3 <- "model{
+for(i in 1:length(X)){
+    X[i] ~ dnorm(theta[s[i]], sigma[s[i]]^(-2))
+}
+for(s in 1:n.restaurants){
+theta[s] ~ dnorm(a , b^(-2))
+sigma[s] ~ dunif(c,d)
+}
+a ~ dnorm(10,6)
+b~ dunif(0 ,10)
+c ~ dunif(0,30)
+d ~ dunif(0,100)
+}"
+
+```
+
+
+(b) Compile the model by including the data (this will include the variable for tips, for restaurant and the number of restaurants) and setting starting values (**4 marks**)
+
+```{r, question4b}
+tips_jagsq3 <- jags.model(textConnection(tips_modelq3),
+                         data = list(X = tips_data$tip , s = tips_data$restaurant , n.restaurants = 3),
+                        inits=list(.RNG.name="base::Wichmann-Hill",.RNG.seed=1983))
+```
+
+(c) Burn in the model to remove dependence on starting values and to allow the chains to converge to the stationary distribution (i.e. the posterior) (**1 mark**)
+
+```{r, question4c}
+tips_simq3 <- update(tips_jagsq3, n.iter = 10000)
+```
+
+(d) Simulate from the posterior and comment on convergence using suitable plots and summary statistics (**7 marks**)
+
+```{r, question4d}
+tips_simq3 <- coda.samples(model = tips_jagsq3,
+                          variable.names = c('theta' , 'sigma', 'a' , 'b', 'c' , 'd'),
+                          n.iter = 20000)
+plot(tips_simq3, trace=FALSE)
+plot(tips_simq3, density=FALSE)
+summary(tips_simq3)
+
+tips_jags_multq3 <- jags.model(textConnection(tips_modelq3), 
+data = list(X = tips_data$tip, s = tips_data$restaurant, 
+n.restaurants=3),
+n.chains=4)
+
+tips_sim_multq3<- update(tips_jags_multq3, n.iter=10000)
+
+tips_sim_multq3<- coda.samples(model=tips_jags_multq3, 
+                               variable.names = c("theta", "sigma", "a", "b", "c", "d"),
+                               n.iter=20000)
+
+gelman.plot(tips_sim_multq3)
+gelman.diag(tips_sim_multq3)
+
+```
+
+All of the trace plots except for d have good mixing and stability. All the gelman rubin plots converge quite quickly to 1 and the gelman rubin stat is 1 for each variable, which suggests the chains have converged to a stationary distribution.
+
+(e) Interpret the parameter estimates of $\theta$ and $\sigma$ after running the `summary` function (**6 marks**)
+
+```{r, question4e}
+summary(tips_simq3)
+
+theta_1 <- round(summary(tips_simq3)[1]$statistics[8,1] , 3)
+sigma_1 <-round(summary(tips_simq3)[1]$statistics[5,1] , 3)
+theta_1
+sigma_1
+
+theta_2 <- round(summary(tips_simq3)[1]$statistics[9,1] , 3)
+sigma_2<- round(summary(tips_simq3)[1]$statistics[6,1] , 3)
+theta_2
+sigma_2
+
+theta_3 <- round(summary(tips_simq3)[1]$statistics[10,1] , 3)
+sigma_3 <- round(summary(tips_simq3)[1]$statistics[7,1] , 3)
+theta_3
+sigma_3
+
+```
+In restaurant 1 the mean tip is 7.95 and the sd is 5.95.
+In restaurant 2 the mean tip is 7.60 and the sd is 6.07.
+In restaurant 3 the mean tip is 7.32 and the sd is 5.67.
+
+(f) Define the Gelman-Rubin statistic, give the intuition behind this measure of performance. Produce Gelman-Rubin statistics and plots for this model, and interpret the results. (**6 marks**)
+
+```{r, question4f}
+gelman.diag(tips_sim_multq3)
+gelman.plot(tips_sim_multq3)
+```
+The Gelman–Rubin diagnostic evaluates MCMC convergence by analyzing the difference between multiple Markov chains. The convergence is assessed by comparing the estimated between-chains and within-chain variances for each model parameter.
+This implies the chains have converged to a stationary distribution.
+
+The gelman rubin plots shown here converge quite quickly to 1 . The point estimate for all of the variable for the gelman rubin statistic is 1
+
+(g) Compute, plot and interpret a 95% interval for the mean tip from each restaurant. Use these intervals to choose the restaurant you'd like to work at. (**8 marks**)
+
+```{r, question4g}
+tips_chainsq3 <- data.frame(sim = rep(1:20000, 4),
+                           chain = c(rep(1,20000),
+                                     rep(2,20000),
+                                     rep(3,20000),
+                                     rep(4,20000)),
+                           rbind(tips_sim_multq3[[1]],
+                                 tips_sim_multq3[[2]],
+                                 tips_sim_multq3[[3]],
+                                 tips_sim_multq3[[4]]))
+
+quantile(tips_chainsq3$theta.1. , probs = c(.025,.975))
+
+tips_chainsq3 %>% ggplot(aes(x=theta.1.)) + geom_density() + geom_vline(xintercept = quantile(tips_chainsq3$theta.1. , probs = c(.025,.975)) , col = 'red')
+median(tips_chainsq3$theta.1.)
+
+quantile(tips_chainsq3$theta.2. , probs = c(.025,.975))
+
+tips_chainsq3 %>% ggplot(aes(x=theta.2.)) + geom_density() + geom_vline(xintercept = quantile(tips_chainsq3$theta.2. , probs = c(.025,.975)) , col = 'red')
+median(tips_chainsq3$theta.2.)
+
+quantile(tips_chainsq3$theta.3. , probs = c(.025,.975))
+
+tips_chainsq3 %>% ggplot(aes(x=theta.3.)) + geom_density() + geom_vline(xintercept = quantile(tips_chainsq3$theta.3. , probs = c(.025,.975)) , col = 'red')
+median(tips_chainsq3$theta.3.)
+```
+For restaurant 1 the probability that the mean tip lies between 6.09 and 9.79 is 95%
+Median tip = 7.97
+For restaurant 2 the probability that the mean tip lies between 5.54 and 9.61 is 95%
+Median tip = 7.62
+For restaurant 3 the probability that the mean tip lies between 5.08 and 9.52 is 95%
+Median tip = 7.31
+
+I'd prefer to work at Restaurant 1, It has the highest median tip (7.97)  
+
+[**Q4 = 40 marks**]
+
+[**Total marks = 150**]
